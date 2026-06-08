@@ -1,2 +1,10 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+
+# Local environment / credentials
+.env
 .venv
-__pycache__
+
+# Generated and input data (not code)
+all_data/
