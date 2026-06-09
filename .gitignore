@@ -8,3 +8,6 @@ __pycache__/
 
 # Generated and input data (not code)
 all_data/
+
+# Generated evaluation reports
+evaluation_results/

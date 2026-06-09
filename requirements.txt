@@ -3,3 +3,7 @@
 openai
 google-genai
 python-dotenv
+
+# Evaluation
+numpy
+matplotlib  # only scripts/generate_evaluation_plots.py
