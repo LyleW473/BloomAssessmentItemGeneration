@@ -6,6 +6,7 @@ verifying each generation stage. The generated questions, along with their scena
 and expected answers, are saved per generator in a structured JSON format for further use.
 """
 import set_path
+import argparse
 import json
 import os
 
@@ -21,7 +22,24 @@ from src.data_processing.synthetic.generation_and_verification.sbqs.verifier imp
 from src.data_processing.synthetic.bloom_system_instructions.sbqs.generation import QUESTION_GEN_MAPPINGS
 from src.data_processing.synthetic.pipelines.sbqs import BloomSBQGenerator, ZeroShotSBQGenerator, MultiStageZeroShotSBQGenerator
 
+# Models to generate (and benchmark) questions across. These slugs are sent to the
+# OpenAI-compatible endpoint set by OPENAI_BASE_URL, so for OpenRouter they must be
+# provider-namespaced. Override per run with --models.
+DEFAULT_MODELS = [
+    "openai/gpt-4o-mini",
+    "openai/gpt-4.1",
+    "google/gemini-2.5-flash",
+]
+
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description="Generate synthetic SBQs across models and generation pipelines.")
+    parser.add_argument("--models", nargs="+", default=DEFAULT_MODELS,
+                        help=f"Model slugs to benchmark across (default: {DEFAULT_MODELS}). Use provider-namespaced slugs for OpenRouter, e.g. 'openai/gpt-4o-mini', 'google/gemini-2.5-flash'.")
+    parser.add_argument("--sbq-input", choices=["compressed", "raw"], default="compressed",
+                        help="Text the SBQ generators are grounded in. 'compressed' (default) uses preprocessing's compressed_text; 'raw' uses the uncompressed extracted text to reproduce the published paper (which, due to a bug, fed raw text to every SBQ generator).")
+    args = parser.parse_args()
+
     # Load keys
     load_dotenv()
     OPENAI_LLM_API_KEY = os.getenv("OPENAI_LLM_API_KEY", None)
@@ -30,20 +48,18 @@ if __name__ == "__main__":
     for key in [OPENAI_LLM_API_KEY, OPENAI_BASE_URL]:
         if key is None:
             raise ValueError(f"{key} not found in environment variables")
-    
+
     # Initialise OpenAI client
     client = OpenAI(
         api_key=OPENAI_LLM_API_KEY,
         base_url=OPENAI_BASE_URL,
         timeout=60
     )
-    
-    # Models to generate (and benchmark) questions across
-    model_names = [
-        "gemini-2.5-flash",
-        "gpt-4.1",
-        "gpt-4o-mini",
-    ]
+
+    # Models to benchmark across (override with --models)
+    model_names = args.models
+    print(f"Models: {model_names}")
+    print(f"SBQ input text: {args.sbq_input}")
 
     # Load module data (each JSON file under contents/ holds one course/module's extracted content)
     module_json_files:List[str] = os.listdir(f"{BASE_EXTRACTED_QUESTIONS_DATA_DIR}/contents")
@@ -87,7 +103,25 @@ if __name__ == "__main__":
             #     break
 
             print(f"Processing file {i+1}/{len(filtered_extracted_texts_dict)}: {file_name}")
-            extracted_text = content_dict["compressed_text"]
+
+            # Select the text the SBQ generators are grounded in.
+            #   "compressed" (default): preprocessing's compressed_text (fallback to raw if absent) — corrected behavior.
+            #   "raw": the uncompressed extracted text — reproduces the published paper.
+            #
+            # KNOWN BUG / REPRODUCIBILITY: the published SBQ results were generated on RAW text. The driver
+            # passed the unmodified content_dict to every generator, and the SBQ pipelines read
+            # content_dict["text"] (raw), so compressed_text was silently ignored for ALL SBQ generators.
+            # The bug was uniform across pipelines, so the paper's pipeline-vs-pipeline SBQ comparison stays
+            # valid; only the input text differed from intent. Use --sbq-input raw to reproduce the paper.
+            if args.sbq_input == "compressed":
+                input_text = content_dict.get("compressed_text") or content_dict.get("text")
+            else:  # "raw"
+                input_text = content_dict.get("text")
+
+            # The SBQ pipelines read content_dict["text"], so inject the chosen text under that key
+            # (mirrors generate_saqs.py).
+            content_for_generation = dict(content_dict)
+            content_for_generation["text"] = input_text
 
             for model_name in model_names:
                 # Four baselines plus the proposed Bloom-aware pipeline, compared per file and model:
@@ -106,7 +140,7 @@ if __name__ == "__main__":
                     print(f"Using question generator: {generator_name} for file: {file_name}")
                     result:Dict[str, List[Dict[str, Any]]] = question_generators[generator_name].generate_questions(
                         file_name=file_name,
-                        content_dict=content_dict,
+                        content_dict=content_for_generation,
                     )
                     if file_name not in results_per_generator[generator_name][model_name]:
                         results_per_generator[generator_name][model_name][file_name] = []

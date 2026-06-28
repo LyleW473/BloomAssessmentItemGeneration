@@ -171,6 +171,9 @@ all_data/processed_assessment/metadata/<name>_metadata.json
 ```bash
 python scripts/generate_saqs.py # short-answer questions
 python scripts/generate_sbqs.py # scenario-based questions
+
+# Optional: choose the models to benchmark across (provider-namespaced for OpenRouter)
+python scripts/generate_saqs.py --models openai/gpt-4o-mini openai/gpt-4.1 google/gemini-2.5-flash
 ```
 
 Each script walks every course JSON and generates questions with **five strategies**, so you
@@ -193,6 +196,17 @@ all_data/synthetic/generated_assessment_student_questions/{saqs,sbqs}/<strategy>
 
 Each file is keyed by model name and contains the generated questions, their mark schemes,
 and expected answers.
+
+> **Reproducibility note — SBQ input text.** Earlier runs (including the published paper) had a
+> bug that fed the **raw** extracted text to *every* SBQ generator instead of the
+> `compressed_text` that SAQ uses. The bug was uniform across all SBQ pipelines, so the
+> published *pipeline-vs-pipeline* comparison stays valid — but SBQ generation ran on
+> uncompressed text. `generate_sbqs.py` now defaults to the **corrected** behavior
+> (`--sbq-input compressed`); pass **`--sbq-input raw`** to reproduce the published paper exactly:
+>
+> ```bash
+> python scripts/generate_sbqs.py --sbq-input raw   # reproduce the paper's SBQ behavior
+> ```
 
 ---
 

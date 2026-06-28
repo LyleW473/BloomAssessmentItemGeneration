@@ -5,6 +5,7 @@ question generation and verification to ensure quality and relevance. The genera
 along with their mark schemes and expected answers, are saved in a structured format for further use.
 """
 import set_path
+import argparse
 import json
 import os
 
@@ -19,7 +20,21 @@ from src.data_processing.synthetic.generation_and_verification.saqs.generator im
 from src.data_processing.synthetic.generation_and_verification.saqs.verifier import VerifierSystem
 from src.data_processing.synthetic.pipelines.saqs import ZeroShotSAQGenerator, MultiStageZeroShotSAQGenerator, BloomSAQGenerator
 
+# Models to generate (and benchmark) questions across. These slugs are sent to the
+# OpenAI-compatible endpoint set by OPENAI_BASE_URL, so for OpenRouter they must be
+# provider-namespaced. Override per run with --models.
+DEFAULT_MODELS = [
+    "openai/gpt-4o-mini",
+    "openai/gpt-4.1",
+    "google/gemini-2.5-flash",
+]
+
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description="Generate synthetic SAQs across models and generation pipelines.")
+    parser.add_argument("--models", nargs="+", default=DEFAULT_MODELS,
+                        help=f"Model slugs to benchmark across (default: {DEFAULT_MODELS}). Use provider-namespaced slugs for OpenRouter, e.g. 'openai/gpt-4o-mini', 'google/gemini-2.5-flash'.")
+    args = parser.parse_args()
 
     # Load keys
     load_dotenv()
@@ -29,19 +44,16 @@ if __name__ == "__main__":
     for key in [OPENAI_LLM_API_KEY, OPENAI_BASE_URL]:
         if key is None:
             raise ValueError(f"{key} not found in environment variables")
-    
+
     # Initialise OpenAI client
     client = OpenAI(
         api_key=OPENAI_LLM_API_KEY,
         base_url=OPENAI_BASE_URL
     )
 
-    # Models to generate (and benchmark) questions across
-    model_names = [
-        "gemini-2.5-flash",
-        "gpt-4.1",
-        "gpt-4o-mini"
-    ]
+    # Models to benchmark across (override with --models)
+    model_names = args.models
+    print(f"Models: {model_names}")
 
     # Accumulates generated questions, keyed as: generator_name -> model_name -> file_name -> [questions]
     # (re-initialised per course in the loop below)
