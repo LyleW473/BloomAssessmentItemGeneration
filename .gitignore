@@ -11,3 +11,5 @@ all_data/
 
 # Generated evaluation reports
 evaluation_results/
+
+test_data/

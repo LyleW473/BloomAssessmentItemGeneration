@@ -1,9 +1,14 @@
 # Runtime dependencies for the SAQ/SBQ assessment question-generation project.
-# TODO: Add exact versions
 openai
 google-genai
 python-dotenv
 
+# Data preprocessing (scripts/preprocess_data.py: file extraction + parsing)
+fastapi # UploadFile wrapper passed to the parser
+llama-parse # LlamaParse document parsing (PDF/PPT/DOCX/MD)
+llama-index # llama_index.core.schema.Document
+langchain-text-splitters # RecursiveCharacterTextSplitter chunking
+
 # Evaluation
 numpy
-matplotlib  # only scripts/generate_evaluation_plots.py
+matplotlib # only scripts/generate_evaluation_plots.py
